@@ -11,12 +11,9 @@ import numpy as np
 from numpy import exp
 #import matplotlib.pyplot as plt
 import math 
-from math import exp
 #import seaborn as sns
 import random
-from statsmodels.tsa.stattools import pacf
 from scipy.integrate import odeint
-from scipy.optimize import minimize
 from sklearn import preprocessing
 from copy import deepcopy
 

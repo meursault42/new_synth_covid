@@ -6,15 +6,12 @@ Created on Mon Mar  8 15:43:09 2021
 """
 
 #%% libraries
-#os.chdir('C:\\Users\\u6026797')
-#os.chdir('C:\\Users\\u6026797\\Documents\\GitHub\\synth_covid\\python')
 import os
 import pandas as pd
 import numpy as np
 from SIR_model import SIR_generation
-from gen_noise_profile import get_hmm_outputs, generate_noise_sequences
+from gen_noise_final import QuasiPeriod
 import matplotlib.pyplot as plt
-
 
 obs_Rt_intercept_vec = [1.193625387,1.830699913,2.074106191,2.178497481,3.326645157,
          2.063410566,2.701420497,3.564527643,2.321210991,3.00477709,2.217962438,
@@ -59,94 +56,52 @@ unique_index = input_data_df['index'].unique()
 
 plt.figure(figsize=(10,3))
 plt.plot(input_data_df[input_data_df['index']=='Utah']['noise_seq'].to_numpy()[0])
-plt.title('Utah Covid Cases')
-
-plt.figure(figsize=(10,3))
-plt.plot(np.diff(input_data_df[input_data_df['index']=='Utah']['noise_seq'].to_numpy()[0]))
-plt.title("Utah Covid Cases (diff'd)")
-
-fig, ax = plt.subplots(1, 1, figsize=(10, 3))
-plot_pacf(np.diff(input_data_df[input_data_df['index']=='Utah']['noise_seq'].to_numpy()[0]),
-          ax=ax)
-plt.plot(x)
+plt.title('Daily New Utah Covid Cases')
 #%% generate SIR curves
-#infection rate = 0.26
-#recovery rate = 0.20
-#asymptomatic infection rate = 0.42
-#asymptomatic test rate = 0.12
-#symptomatic test rate = 0.58
-#asmyptomatic recovery rate = 0.19
-#asymptomatic transmission rate = 0.33
-#symptomatic transmission rate = 0.53
-
-output_sir_seqs = SIR_generation(n_seqs=100, pop_size=1000000, 
+output_sir_seqs, r0_seqs = SIR_generation(n_seqs=100, pop_size=1000000, 
                    best_est_params=[0.26, 0.20, 0.42, 0.12, 0.58, 0.19, 0.33, 0.53],
                    permute_params=False, intercept_dist=obs_Rt_intercept_vec,
-                   min_outbreak_threshold=200,rt_method='Rtg',all_compartments=False)
+                   min_outbreak_threshold=300,rt_method='Rtg',all_compartments=False)
 #visualise infection curves
 for i in output_sir_seqs:
     plt.plot(i)
 plt.title('100 Sample SIR Curves')
-
-model,mag_vec,dir_dict, n_list=get_hmm_outputs(subset_index=unique_index,input_data_df=input_data_df,n_order=0)
-
-post_samp = []
-for i in range(100):
-    hmm_sample=model.sample(35)
-    post_samp.append(hmm_sample[0])
-post_samp = np.concatenate(post_samp)
-
-#create two hist plots to compare sampled distribution to obs dist
-fig, ax = plt.subplots(2,1,figsize=(12,8))
-ax[0]=sns.histplot(post_samp,ax=ax[0],bins=9)
-ax[0].set(title='HMM samples of mean length for 56 locations [4th order]')
-ax[1]=sns.histplot(emm_vec,ax=ax[1],bins=9)
-ax[1].set(title='Observed Periodicity from windowed PACF on all States/Territories [4th order]')
 #%% Sample noise generation code
-#generate sample sequences
-#input_ts_list=[]
-#for j in range(0,100,1):
-#    input_ts_list.append(np.hstack([i for i in range(0,365,1)]))
+qp = QuasiPeriod(likely_index=[5,6,7,8,9,11],sig_cutoff=0,verbose=False)
 
-output_seq, m, shuffles = generate_noise_sequences(input_ts_list=output_sir_seqs, 
-                         subset_index=unique_index,
-                         input_data_df=input_data_df,
-                         n_periodic_components=1, white_noise=False, 
-                         white_noise_weight = 0.05, shuffle_permute=True,
-                         shuffle_prob = 30, smooth_transitions=False)
+noised_sequences, mc_model, shuffle_indexes = qp.generate_noise_sequences(output_sir_seqs,
+                                                                          subset_index=unique_index,
+                                                                          input_data_df=input_data_df,
+                                                                          white_noise=True)
+plt.plot(output_sir_seqs[0])
+plt.plot(noised_sequences[0])
 
-plt.plot(output_seq[420])
-for i in range(0,50):
-    plt.plot(output_seq[i])
-plt.title('50 Sample Noised SIR Curves')
-#%% Visualize sample noised curves
+mc_samples = mc_model.sample(10000)
+import seaborn as sns
+sns.histplot(mc_samples[0])
 
-output_list_seq_df = pd.DataFrame(columns = ['Country_Region','Dt','NewPat','Oracle_kz','shuffles'])
-for i in range(0,len(output_sir_seqs)):    
-    output_list_seq_df=output_list_seq_df.append({'Country_Region' : i, \
-                              'Dt' : np.array([j for j in range(1,1001)]),\
-                              'NewPat' : output_seq[i],\
-                              'Oracle_kz' : output_sir_seqs[i],
-                              'shuffles' : shuffles[i]}, ignore_index=True)
-output_list_seq_df.to_pickle('realistic_sir_curves.pkl',protocol=4)
+#%% Sample noise generation code with statistical censoring
+qp = QuasiPeriod(likely_index=[5,6,7,8,9,11],sig_cutoff=0.05,verbose=False)
 
+noised_sequences_2, mc_model_2, shuffle_indexes_2 = qp.generate_noise_sequences(output_sir_seqs,
+                                                                          subset_index=unique_index,
+                                                                          input_data_df=input_data_df,
+                                                                          white_noise=True)
 
-plt.plot(output_list_seq_df.head(1)['NewPat'].to_numpy()[0])
-plt.plot(output_list_seq_df.head(1)['Oracle_kz'].to_numpy()[0])
-plt.title('Sample Individiual SIR Curve+Noise')
+plt.plot(output_sir_seqs[0])
+plt.plot(noised_sequences_2[0])
 
-Tot = 10
-Cols = 2
-Rows = Tot // Cols 
-Rows += Tot % Cols
+mc_samples = mc_model_2.sample(10000)
+sns.histplot(mc_samples[0])
 
-# Create a Position index
-plt.figure(figsize=(10,8))
-Position = range(1,Tot + 1)
-fig = plt.figure(1)
-for k in range(Tot):
-  ax = fig.add_subplot(Rows,Cols,Position[k])
-  ax.plot(output_seq[k],label='noised sequence')
-  ax.plot(output_sir_seqs[k],label='Simulated SIR curve')
-ax.legend()
-fig.suptitle('Simulated SIR modelled outbreaks with Modelled Noise')
+#%% Several methods have been made independantly callable from the large wrapper
+test_seq = input_data_df[input_data_df['index']=='Utah']['noise_seq'].to_numpy()[0]
+
+#runs individual assessment on a single ts vector, returns fit information
+qpfit = qp.emission_hmm(test_seq)
+
+s_input_data_df = input_data_df.head()
+s_input_data_df_ind = s_input_data_df['index'].to_list()
+#runs fit assessment on group of vectors without generating noise sequences
+model, mag_vec, dir_dict, n_vec = qp.get_hmm_outputs(subset_index=s_input_data_df_ind,
+                                                              input_data_df=s_input_data_df)
