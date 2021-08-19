@@ -54,11 +54,13 @@ input_data_df=input_data_df.drop([input_data_df[input_data_df['index']=='Grand P
 #update index
 unique_index = input_data_df['index'].unique()
 
+#
+date_axis = list(df.columns)[-(len(input_data_df[input_data_df['index']=='Utah']['noise_seq'].to_numpy()[0])):]
 plt.figure(figsize=(10,3))
-plt.plot(input_data_df[input_data_df['index']=='Utah']['noise_seq'].to_numpy()[0])
+plt.plot(date_axis,input_data_df[input_data_df['index']=='Utah']['noise_seq'].to_numpy()[0])
 plt.title('Daily New Utah Covid Cases')
 #%% generate SIR curves
-output_sir_seqs, r0_seqs = SIR_generation(n_seqs=100, pop_size=1000000, 
+output_sir_seqs, r0_seqs = SIR_generation(n_seqs=10, pop_size=1000000, 
                    best_est_params=[0.26, 0.20, 0.42, 0.12, 0.58, 0.19, 0.33, 0.53],
                    permute_params=False, intercept_dist=obs_Rt_intercept_vec,
                    min_outbreak_threshold=300,rt_method='Rtg',all_compartments=False)
@@ -79,21 +81,71 @@ plt.plot(noised_sequences[0])
 mc_samples = mc_model.sample(10000)
 import seaborn as sns
 sns.histplot(mc_samples[0])
-
 #%% Sample noise generation code with statistical censoring
-qp = QuasiPeriod(likely_index=[5,6,7,8,9,11],sig_cutoff=0.05,verbose=False)
+qp = QuasiPeriod(likely_index=[5,6,7,8,9,11],sig_cutoff=0.09,verbose=False)
 
-noised_sequences_2, mc_model_2, shuffle_indexes_2 = qp.generate_noise_sequences(output_sir_seqs,
+noised_sequences_2, mc_model_2, shuffle_indexes_2,iter_example = qp.generate_noise_sequences(output_sir_seqs,
                                                                           subset_index=unique_index,
                                                                           input_data_df=input_data_df,
                                                                           white_noise=True)
 
-plt.plot(output_sir_seqs[0])
-plt.plot(noised_sequences_2[0])
+plt.plot(output_sir_seqs[1])
+plt.plot(noised_sequences_2[1])
+
+
+plt.plot(output_sir_seqs[4])
+plt.plot(iter_example[14])
+plt.plot(iter_example[13])
+plt.plot(noise)
+
+plt.figure(figsize=(23,3.7),dpi=400)
+plt.plot(output_sir_seqs[4],linewidth=3,alpha=.9,label='COVID-19 SIR Simulation',linestyle='dashed',color='#003f72')
+plt.plot(iter_example[14],linewidth=2,label='Batch Permutations',color='#0083be')
+plt.plot(noise,linewidth=2,label='random_noise',color='#c4262e')
+plt.plot(iter_example[13],linewidth=3,label='Quasi-Periodic Noise',alpha=.7,color='#557630')
+plt.title('Example Noised Synthetic COVID-19 Curve')
+plt.xlabel('Index')
+plt.ylabel('Synthetic Daily New Reported Cases')
+plt.legend()
+
+
+#ind_vec = np.array([i for i in range(0,len(iter_example[13]))])
+ind_vec = np.ones(len(iter_example[13]))
+white_noise_seq = np.random.normal(0, 1, len(iter_example[13]))
+noise = np.mean((iter_example[13]*2, ((iter_example[13]*white_noise_seq)*.03*2)),axis=0)
+
+plt.plot(iter_example[13])
+plt.plot(noise)
 
 mc_samples = mc_model_2.sample(10000)
 sns.histplot(mc_samples[0])
+#%%
+plt.plot(noised_sequences_2[0])
+plt.plot(output_sir_seqs[0])
 
+plt.plot(r0_seqs[0])
+
+s=output_sir_seqs[0][1:]/output_sir_seqs[0][:-1]
+s=s[15:]
+r0_test = r0_seqs[0][15:]
+
+plt.plot(s)
+plt.plot(r0_test)
+
+plt.plot(np.diff(s))
+plt.plot(np.diff(r0_test))
+
+plt.plot(np.diff(np.diff(r0_test)))
+plt.plot(np.diff(np.diff(s)))
+
+plt.plot(np.diff(np.diff(r0_test))**2)
+plt.plot(np.diff(np.diff(s))**2)
+
+plt.plot((np.diff(np.diff(r0_test))**2)*.001)
+plt.plot(np.diff(np.diff(s))**2)
+
+max((np.diff(np.diff(r0_test))**2)*.001)
+max(np.diff(np.diff(s))**2)
 #%% Several methods have been made independantly callable from the large wrapper
 test_seq = input_data_df[input_data_df['index']=='Utah']['noise_seq'].to_numpy()[0]
 

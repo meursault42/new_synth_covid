@@ -625,6 +625,8 @@ class QuasiPeriod():
         out_list=[]
         periodic_comp_dict = {}
         out_shuffles=[]
+        #temp
+        iterative_example=[]
         #generate nth order periodic noise components and white noise set
         for n in list(range(0,n_periodic_components)):
             if self.verbose==True:
@@ -648,16 +650,19 @@ class QuasiPeriod():
                                         hmm_noise_sample,
                                         periodic_comp_dict[str(n)+'_mag_vec'],
                                         periodic_comp_dict[str(n)+'_dir_dict'])
+                iterative_example.append(seq_c)
                 if smooth_transitions==True:
                     seq_c =self._chain_smoother(seq_c,np.reshape(hmm_noise_sample[0],(chain_len,)))
             #add white noise
             if white_noise==True:
                 seq_c = self._simple_white_noise_gen(seq_c, hmm_noise_sample[0], periodic_comp_dict['0_n_vec'])
+                iterative_example.append(seq_c)
             #add shuffle permutations
             if shuffle_permute==True:
                 seq_c, shuffle_indexes = self._shuffle_permute(seq_c,shuffle_prob=shuffle_prob)
+                iterative_example.append(seq_c)
             ###return seq
             out_list.append(seq_c)
             out_shuffles.append(shuffle_indexes)
-        return(out_list,periodic_comp_dict['0_model'],out_shuffles)
+        return(out_list,periodic_comp_dict['0_model'],out_shuffles,iterative_example)
     
